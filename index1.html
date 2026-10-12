@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta name="theme-color" content="#f4f7fc">
+	<title>CampusClock — Timetable Generator</title>
+	<style>
+		:root {
+			color-scheme: light;
+			--ink: #182b49;
+			--muted: #6c7b92;
+			--line: #e2e9f3;
+			--paper: #fff;
+			--canvas: #f4f7fc;
+			--blue: #3568e8;
+			--blue-dark: #2453c9;
+			--blue-pale: #edf3ff;
+			--mint: #daf6ec;
+			--shadow: 0 16px 48px rgba(35, 62, 112, .08);
+			font-family: Inter, "Segoe UI", Arial, sans-serif;
+		}
+		* { box-sizing: border-box; }
+		body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink); }
+		button, input, select { font: inherit; }
+		button { cursor: pointer; }
+		.app-shell { max-width: 1440px; margin: 0 auto; padding: 0 40px 48px; }
+		.topbar { height: 72px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); }
+		.brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 800; letter-spacing: -.04em; }
+		.brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: white; background: var(--blue); font-size: 19px; }
+		.top-note { color: var(--muted); font-size: 12px; }
+		.intro { display: flex; align-items: end; justify-content: space-between; gap: 24px; padding: 32px 0 24px; }
+		.eyebrow { color: var(--blue); font-size: 11px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+		h1 { margin: 7px 0 6px; font-size: clamp(27px, 3.2vw, 38px); line-height: 1.1; letter-spacing: -.05em; }
+		.intro p { max-width: 670px; margin: 0; color: var(--muted); font-size: 14px; line-height: 1.65; }
+		.privacy { display: flex; align-items: center; gap: 7px; padding-bottom: 4px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+		.privacy span { color: #20a475; font-size: 15px; }
+		.workspace { display: grid; grid-template-columns: minmax(340px, .78fr) minmax(0, 1.5fr); align-items: start; gap: 23px; }
+		.editor, .preview-column { min-width: 0; }
+		.section-head, .preview-heading { display: flex; align-items: center; justify-content: space-between; margin: 0 0 13px; }
+		.section-head h2, .preview-heading h2 { margin: 0; font-size: 16px; letter-spacing: -.025em; }
+		.step { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+		.panel { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--paper); box-shadow: var(--shadow); }
+		.form-content { padding: 20px; }
+		.form-section + .form-section { margin-top: 19px; padding-top: 18px; border-top: 1px solid var(--line); }
+		.form-section-title { display: flex; align-items: center; gap: 9px; margin: 0 0 13px; font-size: 12px; font-weight: 800; }
+		.section-number { width: 23px; height: 23px; display: grid; place-items: center; border-radius: 7px; background: var(--blue-pale); color: var(--blue); font-size: 11px; }
+		.field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+		.field { min-width: 0; }
+		.field.full { grid-column: 1 / -1; }
+		label { display: block; margin-bottom: 6px; color: #42536d; font-size: 11px; font-weight: 750; }
+		.optional { color: #8290a4; font-weight: 500; }
+		input, select { width: 100%; height: 39px; padding: 0 10px; border: 1px solid #dce4ef; border-radius: 7px; outline: none; background: #fbfcfe; color: var(--ink); transition: border-color .16s, box-shadow .16s; }
+		input:focus, select:focus { border-color: #7194f1; background: white; box-shadow: 0 0 0 3px rgba(53, 104, 232, .12); }
+		input::placeholder { color: #a2adbd; }
+		.helper { margin: 5px 0 0; color: #8290a4; font-size: 10px; line-height: 1.5; }
+		.subject-list { display: grid; gap: 8px; }
+		.subject-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 34px; gap: 7px; }
+		.subject-row input { min-width: 0; height: 36px; font-size: 11px; }
+		.remove-subject { width: 34px; height: 36px; border: 1px solid var(--line); border-radius: 7px; background: white; color: #7f8ba0; font-size: 17px; }
+		.remove-subject:hover { border-color: #f2b8b8; color: #c23b42; background: #fff8f8; }
+		.add-subject { margin-top: 9px; border: 0; padding: 0; background: transparent; color: var(--blue); font-size: 11px; font-weight: 750; }
+		.add-subject:hover { color: var(--blue-dark); text-decoration: underline; }
+		.days { display: flex; flex-wrap: wrap; gap: 7px; }
+		.day-option { position: relative; }
+		.day-option input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+		.day-option span { min-width: 43px; height: 31px; display: grid; place-items: center; padding: 0 8px; border: 1px solid #dce4ef; border-radius: 7px; background: #fbfcfe; color: #65738a; font-size: 10px; font-weight: 700; cursor: pointer; }
+		.day-option input:checked + span { border-color: #a9bef8; background: var(--blue-pale); color: var(--blue-dark); }
+		.day-option input:focus-visible + span { outline: 3px solid rgba(53, 104, 232, .25); outline-offset: 2px; }
+		.actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 13px 20px; border-top: 1px solid var(--line); background: #fafbfd; }
+		.button { min-height: 39px; border: 1px solid transparent; border-radius: 7px; padding: 0 12px; font-size: 11px; font-weight: 750; transition: .16s ease; }
+		.button:active { transform: translateY(1px); }
+		.button-primary { flex: 1; background: var(--blue); color: white; }
+		.button-primary:hover { background: var(--blue-dark); }
+		.button-secondary { border-color: var(--line); background: white; color: #485a73; }
+		.button-secondary:hover { border-color: #b6c4d8; background: #f8faff; }
+		.button-print { background: var(--mint); color: #176346; }
+		.button-print:hover { background: #c8efdf; }
+		.preview-heading { min-height: 39px; }
+		.live-label { display: inline-flex; align-items: center; gap: 7px; color: #21845e; font-size: 10px; font-weight: 800; letter-spacing: .06em; }
+		.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #35b27d; box-shadow: 0 0 0 3px #e4f7ee; }
+		.table-card { overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: white; box-shadow: var(--shadow); }
+		.timetable-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 17px 20px; border-bottom: 1px solid var(--line); }
+		.college-title { min-width: 0; }
+		.college-title h3 { overflow: hidden; margin: 0 0 4px; font-size: 17px; letter-spacing: -.035em; text-overflow: ellipsis; white-space: nowrap; }
+		.college-title p { margin: 0; color: var(--muted); font-size: 11px; }
+		.timetable-badge { flex: 0 0 auto; padding: 7px 10px; border-radius: 7px; background: var(--blue-pale); color: var(--blue-dark); font-size: 10px; font-weight: 800; }
+		.table-scroll { overflow-x: auto; }
+		table { width: 100%; min-width: 720px; border-collapse: collapse; text-align: left; }
+		th { padding: 11px 9px; border-bottom: 1px solid var(--line); background: #f8faff; color: #697993; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .055em; }
+		th:first-child, td:first-child { width: 100px; padding-left: 17px; }
+		td { height: 64px; padding: 7px; border-bottom: 1px solid #edf1f7; border-right: 1px solid #edf1f7; vertical-align: middle; }
+		th:last-child, td:last-child { border-right: 0; }
+		tbody tr:last-child td { border-bottom: 0; }
+		.time-label { color: #334766; font-size: 10px; font-weight: 750; white-space: nowrap; }
+		.time-label small { display: block; margin-top: 4px; color: #8a97aa; font-size: 9px; font-weight: 600; }
+		.cell-button { width: 100%; min-height: 46px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 4px; border: 1px solid transparent; border-radius: 7px; padding: 6px 7px; background: #f0f5ff; color: #254da8; text-align: left; transition: .14s ease; }
+		.cell-button:hover { border-color: #bed0ff; background: #e8efff; }
+		.cell-subject { overflow: hidden; width: 100%; font-size: 10px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+		.cell-teacher { overflow: hidden; width: 100%; color: #7182a1; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+		.empty-cell { color: #9aa6b7; background: #fafbfd; }
+		.break-row td { height: 35px; border-bottom: 1px solid #edf1f7; background: #f4fbf8; color: #338064; text-align: center; }
+		.break-label { font-size: 10px; font-weight: 800; }
+		.break-time { display: block; margin-top: 3px; color: #789b8b; font-size: 9px; }
+		.off-day { color: #9aa6b7; font-size: 10px; font-weight: 650; text-align: center; }
+		.empty-state { padding: 45px 20px; text-align: center; }
+		.empty-icon { width: 48px; height: 48px; display: grid; place-items: center; margin: 0 auto 12px; border-radius: 14px; background: var(--blue-pale); color: var(--blue); font-size: 22px; }
+		.empty-state h3 { margin: 0 0 6px; font-size: 14px; }
+		.empty-state p { max-width: 340px; margin: 0 auto; color: var(--muted); font-size: 11px; line-height: 1.6; }
+		.table-foot { padding: 11px 17px; border-top: 1px solid var(--line); color: #8290a4; font-size: 10px; }
+		.error-box { display: none; margin: 0 0 12px; padding: 10px 12px; border: 1px solid #f2c3c3; border-radius: 8px; background: #fff6f6; color: #a3333d; font-size: 11px; line-height: 1.5; }
+		.error-box.show { display: block; }
+		.toast { position: fixed; z-index: 10; left: 50%; bottom: 22px; max-width: calc(100vw - 32px); transform: translate(-50%, 12px); padding: 11px 15px; border-radius: 8px; background: #1d3151; color: white; font-size: 12px; font-weight: 650; opacity: 0; pointer-events: none; transition: .2s ease; }
+		.toast.show { transform: translate(-50%, 0); opacity: 1; }
+		dialog { width: min(410px, calc(100% - 32px)); border: 1px solid var(--line); border-radius: 13px; padding: 0; box-shadow: 0 24px 80px rgba(23, 42, 76, .25); color: var(--ink); }
+		dialog::backdrop { background: rgba(18, 33, 58, .42); }
+		.dialog-content { padding: 20px; }
+		.dialog-content h2 { margin: 0 0 5px; font-size: 17px; }
+		.dialog-hint { margin: 0 0 17px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+		.dialog-field { margin-top: 12px; }
+		.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 19px; }
+		:focus-visible { outline: 3px solid rgba(53, 104, 232, .28); outline-offset: 2px; }
+		@media (max-width: 980px) {
+			.app-shell { padding-right: 24px; padding-left: 24px; }
+			.workspace { grid-template-columns: minmax(300px, .85fr) minmax(0, 1.15fr); gap: 15px; }
+			.form-content { padding: 16px; }
+			.actions { padding: 12px 16px; }
+			.subject-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 32px; }
+		}
+		@media (max-width: 740px) {
+			.app-shell { padding: 0 15px 28px; }
+			.topbar { height: 62px; }
+			.top-note { font-size: 10px; }
+			.intro { display: block; padding: 25px 0 19px; }
+			.intro p { font-size: 13px; }
+			.privacy { margin-top: 11px; }
+			.workspace { display: flex; flex-direction: column; gap: 24px; }
+			.editor, .preview-column { width: 100%; }
+			.field-grid { gap: 11px 9px; }
+			.preview-heading { margin-bottom: 10px; }
+			.timetable-header { padding: 14px; }
+		}
+		@media (max-width: 430px) {
+			.app-shell { padding-right: 11px; padding-left: 11px; }
+			.top-note { max-width: 115px; text-align: right; }
+			.form-content { padding: 14px; }
+			.actions { padding: 11px 14px; }
+			.actions .button { padding: 0 9px; font-size: 10px; }
+			.subject-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 30px; gap: 5px; }
+			.subject-row input { padding: 0 7px; font-size: 10px; }
+			.remove-subject { width: 30px; }
+		}
+		@media print {
+			@page { size: landscape; margin: 10mm; }
+			body { background: white; }
+			.topbar, .intro, .editor, .preview-heading, .table-foot, .toast { display: none !important; }
+			.app-shell { max-width: none; padding: 0; }
+			.workspace { display: block; }
+			.table-card { border: 0; box-shadow: none; }
+			.timetable-header { padding: 0 0 12px; }
+			.table-scroll { overflow: visible; }
+			table { min-width: 0; }
+			th, td { padding: 7px; }
+			.cell-button { min-height: 38px; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+			.break-row td, th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+		}
+		@media (prefers-reduced-motion: reduce) {
+			*, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+		}
+	</style>
+</head>
+<body>
+	<div class="app-shell">
+		<header class="topbar">
+			<div class="brand"><span class="brand-mark" aria-hidden="true">◷</span><span>CampusClock</span></div>
+			<div class="top-note">Your week, organized in a few clicks.</div>
+		</header>
+		<main>
+			<section class="intro" aria-labelledby="page-title">
+				<div>
+					<div class="eyebrow">Make room for a great semester</div>
+					<h1 id="page-title">Your week, at a glance.</h1>
+					<p>Tell us about your classes and we'll put together a clear weekly timetable. Change any class right in the schedule, and your work stays saved in this browser.</p>
+				</div>
+				<div class="privacy"><span aria-hidden="true">●</span> Saved privately on this device</div>
+			</section>
+			<div class="workspace">
+				<section class="editor" aria-labelledby="setup-title">
+					<div class="section-head"><h2 id="setup-title">Set up your timetable</h2><span class="step">01 / Details</span></div>
+					<div id="error-box" class="error-box" role="alert"></div>
+					<form class="panel" id="timetable-form" novalidate>
+						<div class="form-content">
+							<section class="form-section">
+								<h3 class="form-section-title"><span class="section-number">1</span>Your class</h3>
+								<div class="field-grid">
+									<div class="field full"><label for="college">College name</label><input id="college" name="college" maxlength="80" placeholder="e.g. Lakeside College"></div>
+									<div class="field full"><label for="className">Class / section</label><input id="className" name="className" maxlength="60" placeholder="e.g. B.Sc. Computer Science · Section A"></div>
+									<div class="field full">
+										<label>Subjects and teachers</label>
+										<div id="subject-list" class="subject-list"></div>
+										<button class="add-subject" id="add-subject" type="button">+ Add a subject</button>
+										<p class="helper">Add at least one subject. A teacher name is optional.</p>
+									</div>
+								</div>
+							</section>
+							<section class="form-section">
+								<h3 class="form-section-title"><span class="section-number">2</span>Class schedule</h3>
+								<div class="field-grid">
+									<div class="field full">
+										<label>Working days</label>
+										<div class="days" id="working-days" aria-label="Choose working days">
+											<label class="day-option"><input type="checkbox" value="Monday" checked><span>Mon</span></label>
+											<label class="day-option"><input type="checkbox" value="Tuesday" checked><span>Tue</span></label>
+											<label class="day-option"><input type="checkbox" value="Wednesday" checked><span>Wed</span></label>
+											<label class="day-option"><input type="checkbox" value="Thursday" checked><span>Thu</span></label>
+											<label class="day-option"><input type="checkbox" value="Friday" checked><span>Fri</span></label>
+											<label class="day-option"><input type="checkbox" value="Saturday" checked><span>Sat</span></label>
+										</div>
+									</div>
+									<div class="field"><label for="periods">Periods per day</label><input id="periods" type="number" min="1" max="12" step="1" value="6" inputmode="numeric"></div>
+									<div class="field"><label for="startTime">Start time</label><input id="startTime" type="time" value="09:00"></div>
+									<div class="field"><label for="periodDuration">Period duration (minutes)</label><input id="periodDuration" type="number" min="15" max="180" step="5" value="50" inputmode="numeric"></div>
+									<div class="field"><label for="breakDuration">Break duration (minutes)</label><input id="breakDuration" type="number" min="5" max="120" step="5" value="15" inputmode="numeric"></div>
+									<div class="field full"><label for="breakAfter">Break after period(s) <span class="optional">(optional)</span></label><input id="breakAfter" inputmode="text" maxlength="30" placeholder="e.g. 2, 4"><p class="helper">Enter period numbers separated by commas. A break is added after each one.</p></div>
+								</div>
+							</section>
+						</div>
+						<div class="actions">
+							<button class="button button-primary" type="submit">Generate timetable <span aria-hidden="true">→</span></button>
+							<button class="button button-secondary" id="sample-button" type="button">Try sample</button>
+							<button class="button button-secondary" id="clear-button" type="button">Clear</button>
+							<button class="button button-print" id="print-button" type="button">Print / PDF</button>
+						</div>
+					</form>
+				</section>
+				<section class="preview-column" aria-labelledby="preview-title">
+					<div class="preview-heading"><h2 id="preview-title">Weekly timetable</h2><span class="live-label"><span class="live-dot" aria-hidden="true"></span> READY TO PLAN</span></div>
+					<div class="table-card" id="timetable-card">
+						<div class="empty-state" id="empty-state">
+							<div class="empty-icon" aria-hidden="true">▦</div>
+							<h3>Your timetable will appear here</h3>
+							<p>Add your subjects and class times, then choose “Generate timetable.” You can also load a sample to see how it works.</p>
+						</div>
+						<div id="timetable-content" hidden>
+							<div class="timetable-header">
+								<div class="college-title"><h3 id="display-college">My College</h3><p id="display-class">Weekly class schedule</p></div>
+								<div class="timetable-badge" id="display-periods">6 PERIODS / DAY</div>
+							</div>
+							<div class="table-scroll">
+								<table aria-label="Weekly class timetable">
+									<thead><tr id="table-head"></tr></thead>
+									<tbody id="table-body"></tbody>
+								</table>
+							</div>
+							<div class="table-foot">Tip: Select any subject cell to edit it. Changes are saved automatically.</div>
+						</div>
+					</div>
+				</section>
+			</div>
+		</main>
+	</div>
+	<dialog id="edit-dialog" aria-labelledby="edit-title">
+		<form class="dialog-content" id="edit-form">
+			<h2 id="edit-title">Edit class</h2>
+			<p class="dialog-hint" id="edit-hint">Choose a subject for this time slot.</p>
+			<div class="dialog-field"><label for="edit-subject">Subject</label><select id="edit-subject"></select></div>
+			<div class="dialog-field"><label for="edit-teacher">Teacher <span class="optional">(optional)</span></label><input id="edit-teacher" maxlength="80" placeholder="Teacher name"></div>
+			<div class="dialog-actions"><button class="button button-secondary" id="cancel-edit" type="button">Cancel</button><button class="button button-primary" type="submit">Save change</button></div>
+		</form>
+	</dialog>
+	<div class="toast" id="toast" role="status" aria-live="polite"></div>
+	<script>
+		(function () {
+			'use strict';
+
+			const STORAGE_KEY = 'campusclock-timetable-v1';
+			const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+			const form = document.getElementById('timetable-form');
+			const subjectList = document.getElementById('subject-list');
+			const errorBox = document.getElementById('error-box');
+			const toast = document.getElementById('toast');
+			const dialog = document.getElementById('edit-dialog');
+			const editForm = document.getElementById('edit-form');
+			let timetable = null;
+			let editingSlot = null;
+			let toastTimer;
+
+			function showToast(message) {
+				toast.textContent = message;
+				toast.classList.add('show');
+				window.clearTimeout(toastTimer);
+				toastTimer = window.setTimeout(function () { toast.classList.remove('show'); }, 2800);
+			}
+
+			function showError(message) {
+				errorBox.textContent = message;
+				errorBox.classList.add('show');
+				errorBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			}
+
+			function clearError() {
+				errorBox.textContent = '';
+				errorBox.classList.remove('show');
+			}
+
+			function addSubjectRow(subject, teacher) {
+				const row = document.createElement('div');
+				row.className = 'subject-row';
+				const subjectInput = document.createElement('input');
+				subjectInput.className = 'subject-input';
+				subjectInput.type = 'text';
+				subjectInput.maxLength = 60;
+				subjectInput.placeholder = 'Subject name';
+				subjectInput.setAttribute('aria-label', 'Subject name');
+				subjectInput.value = subject || '';
+				const teacherInput = document.createElement('input');
+				teacherInput.className = 'teacher-input';
+				teacherInput.type = 'text';
+				teacherInput.maxLength = 80;
+				teacherInput.placeholder = 'Teacher (optional)';
+				teacherInput.setAttribute('aria-label', 'Teacher name (optional)');
+				teacherInput.value = teacher || '';
+				const removeButton = document.createElement('button');
+				removeButton.className = 'remove-subject';
+				removeButton.type = 'button';
+				removeButton.setAttribute('aria-label', 'Remove subject');
+				removeButton.title = 'Remove subject';
+				removeButton.textContent = '×';
+				removeButton.addEventListener('click', function () {
+					if (subjectList.children.length === 1) {
+						subjectInput.value = '';
+						teacherInput.value = '';
+					} else {
+						row.remove();
+					}
+				});
+				row.append(subjectInput, teacherInput, removeButton);
+				subjectList.append(row);
+			}
+
+			function readSubjects() {
+				const rows = Array.from(subjectList.querySelectorAll('.subject-row'));
+				const subjects = rows.map(function (row) {
+					return {
+						name: row.querySelector('.subject-input').value.trim(),
+						teacher: row.querySelector('.teacher-input').value.trim()
+					};
+				}).filter(function (subject) { return subject.name; });
+				return subjects;
+			}
+
+			function readConfig() {
+				const subjects = readSubjects();
+				const periods = Number(document.getElementById('periods').value);
+				const periodDuration = Number(document.getElementById('periodDuration').value);
+				const breakDuration = Number(document.getElementById('breakDuration').value);
+				const workingDays = Array.from(document.querySelectorAll('#working-days input:checked')).map(function (input) {
+					return input.value;
+				});
+				const rawBreaks = document.getElementById('breakAfter').value.trim();
+				const breaks = rawBreaks ? rawBreaks.split(',').map(function (item) { return Number(item.trim()); }) : [];
+
+				if (!document.getElementById('college').value.trim()) return { error: 'Please enter your college name.' };
+				if (!document.getElementById('className').value.trim()) return { error: 'Please enter your class or section.' };
+				if (!subjects.length) return { error: 'Add at least one subject before generating your timetable.' };
+				if (subjects.length !== subjectList.children.length) return { error: 'Please fill in or remove each blank subject row.' };
+				const uniqueNames = new Set(subjects.map(function (subject) { return subject.name.toLocaleLowerCase(); }));
+				if (uniqueNames.size !== subjects.length) return { error: 'Each subject name should be unique. Please remove duplicate subjects.' };
+				if (!Number.isInteger(periods) || periods < 1 || periods > 12) return { error: 'Periods per day must be a whole number from 1 to 12.' };
+				if (!Number.isInteger(periodDuration) || periodDuration < 15 || periodDuration > 180) return { error: 'Period duration must be between 15 and 180 minutes.' };
+				if (!Number.isInteger(breakDuration) || breakDuration < 5 || breakDuration > 120) return { error: 'Break duration must be between 5 and 120 minutes.' };
+				if (!workingDays.length) return { error: 'Choose at least one working day.' };
+				if (breaks.some(function (value) { return !Number.isInteger(value) || value < 1 || value >= periods; })) {
+					return { error: 'Breaks must be after whole period numbers, from 1 to one less than your periods per day.' };
+				}
+				if (new Set(breaks).size !== breaks.length) return { error: 'Each break period can only be listed once.' };
+				const startTime = document.getElementById('startTime').value;
+				if (!startTime) return { error: 'Choose a start time for your first period.' };
+
+				return {
+					college: document.getElementById('college').value.trim(),
+					className: document.getElementById('className').value.trim(),
+					subjects: subjects,
+					periods: periods,
+					startTime: startTime,
+					periodDuration: periodDuration,
+					breakDuration: breakDuration,
+					breaks: breaks.sort(function (a, b) { return a - b; }),
+					workingDays: workingDays
+				};
+			}
+
+			function formatTime(totalMinutes) {
+				const normalized = ((totalMinutes % 1440) + 1440) % 1440;
+				const hour = Math.floor(normalized / 60);
+				const minute = normalized % 60;
+				const suffix = hour >= 12 ? 'PM' : 'AM';
+				const displayHour = hour % 12 || 12;
+				return displayHour + ':' + String(minute).padStart(2, '0') + ' ' + suffix;
+			}
+
+			function startMinutes(time) {
+				const parts = time.split(':').map(Number);
+				return parts[0] * 60 + parts[1];
+			}
+
+			function makeSchedule(config) {
+				const slots = {};
+				let rotation = 0;
+				DAYS.forEach(function (day) {
+					slots[day] = [];
+					for (let period = 0; period < config.periods; period += 1) {
+						let subjectIndex = (period + rotation) % config.subjects.length;
+						if (config.subjects.length > 1 && slots[day][period - 1] &&
+							config.subjects[subjectIndex].name === slots[day][period - 1].subject) {
+							subjectIndex = (subjectIndex + 1) % config.subjects.length;
+						}
+						const subject = config.subjects[subjectIndex];
+						slots[day].push({ subject: subject.name, teacher: subject.teacher });
+					}
+					rotation = (rotation + 1) % config.subjects.length;
+				});
+				return Object.assign({}, config, { slots: slots });
+			}
+
+			function createCell(tagName, text, className) {
+				const cell = document.createElement(tagName);
+				cell.textContent = text;
+				if (className) cell.className = className;
+				return cell;
+			}
+
+			function renderTimetable(data) {
+				document.getElementById('empty-state').hidden = true;
+				const content = document.getElementById('timetable-content');
+				content.hidden = false;
+				document.getElementById('display-college').textContent = data.college;
+				document.getElementById('display-class').textContent = data.className;
+				document.getElementById('display-periods').textContent = data.periods + ' PERIODS / DAY';
+
+				const head = document.getElementById('table-head');
+				head.replaceChildren();
+				head.append(createCell('th', 'Time'));
+				DAYS.forEach(function (day) { head.append(createCell('th', day)); });
+
+				const body = document.getElementById('table-body');
+				body.replaceChildren();
+				let elapsed = 0;
+				for (let period = 0; period < data.periods; period += 1) {
+					const row = document.createElement('tr');
+					const beginsAt = startMinutes(data.startTime) + elapsed;
+					const endsAt = beginsAt + data.periodDuration;
+					const timeCell = document.createElement('td');
+					timeCell.className = 'time-label';
+					timeCell.append(document.createTextNode('Period ' + (period + 1)));
+					const timeSmall = document.createElement('small');
+					timeSmall.textContent = formatTime(beginsAt) + ' – ' + formatTime(endsAt);
+					timeCell.append(timeSmall);
+					row.append(timeCell);
+
+					DAYS.forEach(function (day) {
+						const cell = document.createElement('td');
+						if (!data.workingDays.includes(day)) {
+							cell.append(createCell('span', 'No classes', 'off-day'));
+						} else {
+							const entry = data.slots[day][period];
+							const button = document.createElement('button');
+							button.type = 'button';
+							button.className = 'cell-button' + (entry && entry.subject ? '' : ' empty-cell');
+							button.setAttribute('aria-label', day + ', period ' + (period + 1) + ': ' +
+								(entry && entry.subject ? entry.subject : 'No subject') + '. Select to edit.');
+							const subjectLabel = document.createElement('span');
+							subjectLabel.className = 'cell-subject';
+							subjectLabel.textContent = entry && entry.subject ? entry.subject : 'Free period';
+							const teacherLabel = document.createElement('span');
+							teacherLabel.className = 'cell-teacher';
+							teacherLabel.textContent = entry && entry.teacher ? entry.teacher : 'Select to edit';
+							button.append(subjectLabel, teacherLabel);
+							button.addEventListener('click', function () { openEditor(day, period); });
+							cell.append(button);
+						}
+						row.append(cell);
+					});
+					body.append(row);
+					elapsed += data.periodDuration;
+
+					if (data.breaks.includes(period + 1)) {
+						const breakRow = document.createElement('tr');
+						breakRow.className = 'break-row';
+						const breakCell = document.createElement('td');
+						breakCell.colSpan = DAYS.length + 1;
+						const breakLabel = document.createElement('span');
+						breakLabel.className = 'break-label';
+						breakLabel.textContent = '☕  Break';
+						const breakTime = document.createElement('span');
+						breakTime.className = 'break-time';
+						breakTime.textContent = formatTime(startMinutes(data.startTime) + elapsed) + ' – ' +
+							formatTime(startMinutes(data.startTime) + elapsed + data.breakDuration);
+						breakCell.append(breakLabel, breakTime);
+						breakRow.append(breakCell);
+						body.append(breakRow);
+						elapsed += data.breakDuration;
+					}
+				}
+			}
+
+			function saveTimetable() {
+				try {
+					window.localStorage.setItem(STORAGE_KEY, JSON.stringify(timetable));
+					return true;
+				} catch (error) {
+					showError('Your timetable could not be saved in this browser. Check that browser storage is available, then try again.');
+					return false;
+				}
+			}
+
+			function populateForm(data) {
+				document.getElementById('college').value = data.college || '';
+				document.getElementById('className').value = data.className || '';
+				document.getElementById('periods').value = data.periods || 6;
+				document.getElementById('startTime').value = data.startTime || '09:00';
+				document.getElementById('periodDuration').value = data.periodDuration || 50;
+				document.getElementById('breakDuration').value = data.breakDuration || 15;
+				document.getElementById('breakAfter').value = (data.breaks || []).join(', ');
+				subjectList.replaceChildren();
+				(data.subjects && data.subjects.length ? data.subjects : [{ name: '', teacher: '' }]).forEach(function (subject) {
+					addSubjectRow(subject.name, subject.teacher);
+				});
+				document.querySelectorAll('#working-days input').forEach(function (input) {
+					input.checked = (data.workingDays || DAYS).includes(input.value);
+				});
+			}
+
+			function openEditor(day, period) {
+				editingSlot = { day: day, period: period };
+				const select = document.getElementById('edit-subject');
+				select.replaceChildren();
+				const freeOption = document.createElement('option');
+				freeOption.value = '';
+				freeOption.textContent = 'Free period';
+				select.append(freeOption);
+				timetable.subjects.forEach(function (subject) {
+					const option = document.createElement('option');
+					option.value = subject.name;
+					option.textContent = subject.name;
+					select.append(option);
+				});
+				const current = timetable.slots[day][period] || { subject: '', teacher: '' };
+				select.value = current.subject;
+				document.getElementById('edit-teacher').value = current.teacher || '';
+				document.getElementById('edit-hint').textContent = day + ' · Period ' + (period + 1) + '. Choose a subject or mark the slot as a free period.';
+				dialog.showModal();
+			}
+
+			function loadSaved() {
+				let saved;
+				try {
+					const raw = window.localStorage.getItem(STORAGE_KEY);
+					if (!raw) return;
+					saved = JSON.parse(raw);
+				} catch (error) {
+					showError('A saved timetable could not be read. You can generate a new timetable to replace it.');
+					return;
+				}
+				if (!saved || !Array.isArray(saved.subjects) || !saved.slots || !Number.isInteger(saved.periods)) {
+					showError('The saved timetable is incomplete. Generate a new timetable to replace it.');
+					return;
+				}
+				timetable = saved;
+				populateForm(saved);
+				renderTimetable(timetable);
+			}
+
+			form.addEventListener('submit', function (event) {
+				event.preventDefault();
+				clearError();
+				const config = readConfig();
+				if (config.error) {
+					showError(config.error);
+					return;
+				}
+				timetable = makeSchedule(config);
+				if (saveTimetable()) {
+					renderTimetable(timetable);
+					showToast('Your timetable is ready and saved on this device.');
+				}
+			});
+
+			document.getElementById('add-subject').addEventListener('click', function () {
+				addSubjectRow('', '');
+				subjectList.lastElementChild.querySelector('.subject-input').focus();
+			});
+
+			document.getElementById('sample-button').addEventListener('click', function () {
+				clearError();
+				const sample = {
+					college: 'Northstar College',
+					className: 'B.Sc. Computer Science · Section A',
+					subjects: [
+						{ name: 'Mathematics', teacher: 'Ms. Patel' },
+						{ name: 'Physics', teacher: 'Mr. Chen' },
+						{ name: 'Programming', teacher: 'Dr. Rivera' },
+						{ name: 'English', teacher: 'Ms. Brooks' },
+						{ name: 'Data Science', teacher: 'Mr. Okafor' }
+					],
+					periods: 6,
+					startTime: '09:00',
+					periodDuration: 50,
+					breakDuration: 15,
+					breaks: [3],
+					workingDays: DAYS.slice(0, 5)
+				};
+				populateForm(sample);
+				timetable = makeSchedule(sample);
+				if (saveTimetable()) {
+					renderTimetable(timetable);
+					showToast('Sample timetable loaded. Try selecting a class to edit it.');
+				}
+			});
+
+			document.getElementById('clear-button').addEventListener('click', function () {
+				try {
+					window.localStorage.removeItem(STORAGE_KEY);
+				} catch (error) {
+					showError('Browser storage could not be cleared. You can still start a new timetable.');
+				}
+				timetable = null;
+				form.reset();
+				subjectList.replaceChildren();
+				addSubjectRow('', '');
+				document.getElementById('empty-state').hidden = false;
+				document.getElementById('timetable-content').hidden = true;
+				clearError();
+				showToast('Timetable cleared.');
+			});
+
+			document.getElementById('print-button').addEventListener('click', function () {
+				if (!timetable) {
+					showError('Generate or load a timetable before printing.');
+					return;
+				}
+				window.print();
+			});
+
+			editForm.addEventListener('submit', function (event) {
+				event.preventDefault();
+				if (!editingSlot || !timetable) return;
+				const subject = document.getElementById('edit-subject').value;
+				const teacherInput = document.getElementById('edit-teacher').value.trim();
+				const matchedSubject = timetable.subjects.find(function (item) { return item.name === subject; });
+				timetable.slots[editingSlot.day][editingSlot.period] = {
+					subject: subject,
+					teacher: subject ? (teacherInput || (matchedSubject ? matchedSubject.teacher : '')) : ''
+				};
+				if (saveTimetable()) {
+					renderTimetable(timetable);
+					dialog.close();
+					showToast('Class updated and saved.');
+				}
+			});
+
+			document.getElementById('cancel-edit').addEventListener('click', function () { dialog.close(); });
+			dialog.addEventListener('close', function () { editingSlot = null; });
+
+			addSubjectRow('', '');
+			loadSaved();
+		}());
+	</script>
+</body>
+</html>
